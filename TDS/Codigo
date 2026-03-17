@@ -1,0 +1,95 @@
+#define TdsSensorPin A1
+#define VREF 5.0
+#define SCOUNT 30
+
+int analogBuffer[SCOUNT];
+int analogBufferTemp[SCOUNT];
+int analogBufferIndex = 0, copyIndex = 0;
+float averageVoltage = 0, tdsValue = 0, temperature = 25;
+
+int getMedianNum(int bArray[], int iFilterLen);
+
+void setup() {
+  Serial.begin(9600);
+  delay(2000);
+
+  Serial.println(F("================================"));
+  Serial.println(F("   TDS Sensor Monitor v1.0      "));
+  Serial.println(F("================================"));
+  Serial.println();
+}
+
+void loop() {
+  static unsigned long analogSampleTimepoint = millis();
+  if (millis() - analogSampleTimepoint > 40U) {
+    analogSampleTimepoint = millis();
+    analogBuffer[analogBufferIndex] = analogRead(TdsSensorPin);
+    analogBufferIndex++;
+    if (analogBufferIndex == SCOUNT)
+      analogBufferIndex = 0;
+  }
+
+  static unsigned long printTimepoint = millis();
+  if (millis() - printTimepoint > 800U) {
+    printTimepoint = millis();
+
+    for (copyIndex = 0; copyIndex < SCOUNT; copyIndex++)
+      analogBufferTemp[copyIndex] = analogBuffer[copyIndex];
+
+    averageVoltage = getMedianNum(analogBufferTemp, SCOUNT) * (float)VREF / 1024.0;
+
+    float compensationCoefficient = 1.0 + 0.02 * (temperature - 25.0);
+    float compensationVoltage     = averageVoltage / compensationCoefficient;
+
+    tdsValue = (133.42 * pow(compensationVoltage, 3)
+              - 255.86 * pow(compensationVoltage, 2)
+              + 857.39 * compensationVoltage) * 0.5;
+
+    // Clasificacion de calidad del agua
+    const char* quality;
+    if      (tdsValue < 300)  quality = "Excelente";
+    else if (tdsValue < 600)  quality = "Buena     ";
+    else if (tdsValue < 900)  quality = "Regular   ";
+    else if (tdsValue < 1200) quality = "Mala      ";
+    else                      quality = "No apta   ";
+
+    Serial.println(F("--------------------------------"));
+    Serial.print  (F("  Voltaje  : "));
+    Serial.print  (averageVoltage, 3);
+    Serial.println(F(" V"));
+    Serial.print  (F("  TDS      : "));
+    Serial.print  (tdsValue, 0);
+    Serial.println(F(" ppm"));
+    Serial.print  (F("  Temp.    : "));
+    Serial.print  (temperature, 1);
+    Serial.println(F(" C"));
+    Serial.print  (F("  Calidad  : "));
+    Serial.println(quality);
+    Serial.println(F("--------------------------------"));
+    Serial.println();
+  }
+}
+
+int getMedianNum(int bArray[], int iFilterLen) {
+  int bTab[iFilterLen];
+  for (byte i = 0; i < iFilterLen; i++)
+    bTab[i] = bArray[i];
+
+  int i, j, bTemp;
+  for (j = 0; j < iFilterLen - 1; j++) {
+    for (i = 0; i < iFilterLen - j - 1; i++) {
+      if (bTab[i] > bTab[i + 1]) {
+        bTemp      = bTab[i];
+        bTab[i]    = bTab[i + 1];
+        bTab[i + 1] = bTemp;
+      }
+    }
+  }
+
+  if ((iFilterLen & 1) > 0)
+    bTemp = bTab[(iFilterLen - 1) / 2];
+  else
+    bTemp = (bTab[iFilterLen / 2] + bTab[iFilterLen / 2 - 1]) / 2;
+
+  return bTemp;
+}
