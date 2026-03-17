@@ -1,0 +1,69 @@
+int sensorPin = A0;
+
+// Symbols for status display
+#define SYM_CLEAR  "[ OK ]"
+#define SYM_CLOUDY "[WARN]"
+#define SYM_DIRTY  "[DIRT]"
+#define BAR_WIDTH  20
+
+String buildBar(int value, int maxVal) {
+  int filled = map(value, 0, maxVal, 0, BAR_WIDTH);
+  String bar = "[";
+  for (int i = 0; i < BAR_WIDTH; i++) {
+    bar += (i < filled) ? "#" : "-";
+  }
+  bar += "]";
+  return bar;
+}
+
+void printSeparator() {
+  Serial.println(F("------------------------------------"));
+}
+
+void setup() {
+  Serial.begin(9600);
+  printSeparator();
+  Serial.println(F("  SENSOR DE TURBIDEZ  v1.0"));
+  Serial.println(F("  Iniciando sistema..."));
+  printSeparator();
+  Serial.println();
+  pinMode(3, OUTPUT);
+  pinMode(4, OUTPUT);
+  pinMode(5, OUTPUT);
+}
+
+void loop() {
+  int sensorValue = analogRead(sensorPin);
+  int turbidity = map(sensorValue, 0, 640, 100, 0);
+
+  String status;
+  String symbol;
+
+  if (turbidity < 20) {
+    status = "CLARA";
+    symbol = SYM_CLEAR;
+  } else if (turbidity < 50) {
+    status = "TURBIA";
+    symbol = SYM_CLOUDY;
+  } else {
+    status = "SUCIA";
+    symbol = SYM_DIRTY;
+  }
+
+  printSeparator();
+  Serial.print(F("  Turbidez : "));
+  Serial.print(turbidity);
+  Serial.println(F(" %"));
+
+  Serial.print(F("  Nivel    : "));
+  Serial.println(buildBar(turbidity, 100));
+
+  Serial.print(F("  Estado   : "));
+  Serial.print(symbol);
+  Serial.print(F("  Agua "));
+  Serial.println(status);
+  printSeparator();
+  Serial.println();
+
+  delay(1000);
+}
